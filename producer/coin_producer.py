@@ -1,4 +1,4 @@
-import ccxt
+import ccxtpro
 import asyncio
 from confluent_kafka import Producer
 
