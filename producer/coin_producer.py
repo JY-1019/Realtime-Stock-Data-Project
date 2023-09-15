@@ -1,52 +1,69 @@
-import ccxtpro
+import os
+import json
+import pprint
 import asyncio
-from confluent_kafka import Producer
+import ccxt.pro as ccxtpro
 
-async def fetch_and_send_to_kafka(upbit, bybit, producer):
-    upbit_symbol = 'BTC/KRW'
-    bybit_symbol = 'BTC/USD'
 
+def get_upbit_exchange():
+    current_path = os.path.dirname(os.path.abspath(__file__))
+    with open(os.path.join(current_path, "config.json"), "r") as config_file:
+        config = json.load(config_file)
+        upbit_api_key = config["upbit_access_key"]
+        upbit_secret_key = config["upbit_secret_key"]
+
+    return ccxtpro.upbit(
+        {
+            "apiKey": upbit_api_key,
+            "secret": upbit_secret_key,
+            "enableRateLimit": True,
+        }
+    )
+
+
+def get_bybit_exchange():
+    current_path = os.path.dirname(os.path.abspath(__file__))
+    with open(os.path.join(current_path, "config.json"), "r") as config_file:
+        config = json.load(config_file)
+        bybit_api_key = config["bybit_access_key"]
+        bybit_secret_key = config["bybit_secret_key"]
+
+    return ccxtpro.bybit(
+        {
+            "apiKey": bybit_api_key,
+            "secret": bybit_secret_key,
+            "enableRateLimit": True,
+        }
+    )
+
+
+def delivery_report(err, msg):
+    """Called once for each message produced to indicate delivery result.
+    Triggered by poll() or flush()."""
+    if err is not None:
+        print("Message delivery failed: {}".format(err))
+    else:
+        print("Message delivered to {} [{}]".format(msg.topic(), msg.partition()))
+
+
+async def send_coin_data_to_kafka(exchange, symbol, producer, topic):
     while True:
         try:
-            upbit_data = await upbit.fetch_ticker(upbit_symbol)
-            bybit_data = await bybit.fetch_ticker(bybit_symbol)
-
-            producer.produce('your_kafka_topic', value=str({'upbit': upbit_data, 'bybit': bybit_data}))
-
-            def delivery_report(err, msg):
-                if err is not None:
-                    print('메시지 전송 오류: {}'.format(err))
-                else:
-                    print('메시지가 성공적으로 전송되었습니다: {}'.format(msg.value()))
-
-            # 비동기로 전송
-            producer.poll(0)
+            ticker = await exchange.watch_ticker(symbol)
+            json_ticker = json.dumps({symbol: ticker})
+            producer.produce(
+                topic, value=json_ticker.encode("utf-8"), callback=delivery_report
+            )
             producer.flush()
+        except Exception as error:
+            print("error :", error)
 
-        except Exception as e:
-            print('오류 발생: {}'.format(str(e)))
+        await asyncio.sleep(1)
 
-        await asyncio.sleep(60)  # 60초마다 데이터 업데이트
 
-def periodic_task(fetch_and_send, upbit, bybit, producer):
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(fetch_and_send(upbit, bybit, producer))
-
-if __name__ == '__main__':
-    import ccxtpro
-    from confluent_kafka import Producer
-
-    # Upbit 설정
-    upbit = ccxtpro.upbit()
-
-    # Bybit 설정
-    bybit = ccxtpro.bybit()
-
-    # Kafka Producer 설정
-    kafka_config = {
-        'bootstrap.servers': 'localhost:9092',  # Kafka 브로커 주소
-    }
-    producer = Producer(kafka_config)
-
-    # 일급 함수를 사용하여 주기적으로 실행
-    periodic_task(fetch_and_send_to_kafka, upbit, bybit, producer)
+async def send_multiple_coins_to_kafka(exchange, symbols, producer, topic):
+    coins = [
+        send_coin_data_to_kafka(exchange, symbol, producer, topic) for symbol in symbols
+    ]
+    await asyncio.gather(*coins)
+    await exchange.close()
