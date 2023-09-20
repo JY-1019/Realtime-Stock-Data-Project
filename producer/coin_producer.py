@@ -38,8 +38,6 @@ def get_bybit_exchange():
 
 
 def delivery_report(err, msg):
-    """Called once for each message produced to indicate delivery result.
-    Triggered by poll() or flush()."""
     if err is not None:
         print("Message delivery failed: {}".format(err))
     else:
@@ -47,21 +45,20 @@ def delivery_report(err, msg):
 
 
 async def send_coin_data_to_kafka(exchange, symbol, producer, topic):
-    while True:
-        try:
-            ticker = await exchange.watch_ticker(symbol)
-            json_ticker = json.dumps({symbol: ticker})
-            producer.produce(
-                topic, value=json_ticker.encode("utf-8"), callback=delivery_report
-            )
-            producer.flush()
-        except Exception as error:
-            print("error :", error)
+    try:
+        ticker = await exchange.watch_ticker(symbol)
+        json_ticker = json.dumps({"symbol": symbol, "data": ticker})
+        producer.produce(
+            topic, value=json_ticker.encode("utf-8"), callback=delivery_report
+        )
+        producer.flush()
+    except Exception as error:
+        print("Exception occurred: {}".format(error))
 
-        await asyncio.sleep(1)
+    await asyncio.sleep(3)
 
 
-async def send_multiple_coins_to_kafka(exchange, symbols, producer, topic):
+async def send_multiple_coins_to_kafka(exchange, symbols: list, producer, topic):
     coins = [
         send_coin_data_to_kafka(exchange, symbol, producer, topic) for symbol in symbols
     ]

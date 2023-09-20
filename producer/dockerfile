@@ -2,7 +2,7 @@ FROM python:3.8
 
 WORKDIR /app
 
-RUN pip install ccxt confluent-kafka
+RUN pip install ccxt confluent-kafka mojito2 pykrx
 
 COPY . .
 
