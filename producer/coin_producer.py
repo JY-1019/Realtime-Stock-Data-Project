@@ -2,7 +2,13 @@ import os
 import json
 import pprint
 import asyncio
+import requests
 import ccxt.pro as ccxtpro
+
+
+EXCHANGE_OPEN_URL = (
+    "https://quotation-api-cdn.dunamu.com/v1/forex/recent?codes=FRX.KRWUSD"
+)
 
 
 def get_upbit_exchange():
@@ -46,8 +52,15 @@ def delivery_report(err, msg):
 
 async def send_coin_data_to_kafka(exchange, symbol, producer, topic):
     try:
+        exchange_data = requests.get(EXCHANGE_OPEN_URL).json()
         ticker = await exchange.watch_ticker(symbol)
-        json_ticker = json.dumps({"symbol": symbol, "data": ticker})
+        json_ticker = json.dumps(
+            {
+                "symbol": symbol,
+                "data": ticker,
+                "exchangeRate": exchange_data[0]["basePrice"],
+            }
+        )
         producer.produce(
             topic, value=json_ticker.encode("utf-8"), callback=delivery_report
         )
@@ -55,7 +68,7 @@ async def send_coin_data_to_kafka(exchange, symbol, producer, topic):
     except Exception as error:
         print("Exception occurred: {}".format(error))
 
-    await asyncio.sleep(3)
+    await asyncio.sleep(1)
 
 
 async def send_multiple_coins_to_kafka(exchange, symbols: list, producer, topic):

@@ -1,3 +1,2 @@
 
-if __name__ == "__main__":
-    print(datetime.datetime.now(datetime.time
+            send_multiple_coins_to_kafka(
