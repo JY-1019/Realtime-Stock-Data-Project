@@ -1,3 +1,5 @@
 producer/config.json
 producer/__pycache__
 .vscode
+.kos*
+.token*
