@@ -1,6 +1,7 @@
 # Realtime-Stock-Data-Project
 
 Pipeline
+
 <img width="700" alt="image" src="https://github.com/JY-1019/Realtime-Stock-Data-Project/assets/76830616/149d8e30-49d1-40e1-9481-c7e7bf01dae6">
 
 
